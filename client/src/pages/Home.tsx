@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { MapView } from "@/components/Map";
 import { DrawingTools } from "@/components/DrawingTools";
+import { getCountries, getProvinces, getDivisionCenter, getDivisionBounds } from "@/data/administrative-divisions";
 
 interface ImageInfo {
   id: string;
@@ -95,6 +96,36 @@ export default function Home() {
     map.setMapTypeId('satellite');
     map.setCenter({ lat: 35.0, lng: 105.0 });
     map.setZoom(4);
+  }, []);
+
+  // 处理国家选择
+  const handleCountryChange = useCallback((countryCode: string) => {
+    setCountry(countryCode);
+    setProvince('');
+    const center = getDivisionCenter(countryCode);
+    if (center && mapRef.current) {
+      mapRef.current.setCenter(center);
+      mapRef.current.setZoom(4);
+    }
+  }, []);
+
+  // 处理省份选择
+  const handleProvinceChange = useCallback((provinceCode: string) => {
+    setProvince(provinceCode);
+    const center = getDivisionCenter(provinceCode);
+    const bounds = getDivisionBounds(provinceCode);
+    if (mapRef.current) {
+      if (bounds) {
+        const latLngBounds = new google.maps.LatLngBounds(
+          { lat: bounds.south, lng: bounds.west },
+          { lat: bounds.north, lng: bounds.east }
+        );
+        mapRef.current.fitBounds(latLngBounds);
+      } else if (center) {
+        mapRef.current.setCenter(center);
+        mapRef.current.setZoom(6);
+      }
+    }
   }, []);
 
   // 用户认证
@@ -410,30 +441,36 @@ export default function Home() {
               <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">国家</label>
-                  <Select value={country} onValueChange={setCountry}>
+                  <Select value={country} onValueChange={handleCountryChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="选择国家" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="china">中国</SelectItem>
-                      <SelectItem value="usa">美国</SelectItem>
-                      <SelectItem value="india">印度</SelectItem>
+                      {getCountries().map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium mb-2 block">省份/州</label>
-                  <Select value={province} onValueChange={setProvince}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择省份" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sichuan">四川省</SelectItem>
-                      <SelectItem value="beijing">北京市</SelectItem>
-                      <SelectItem value="shanghai">上海市</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {country && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">省份/州</label>
+                    <Select value={province} onValueChange={handleProvinceChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择省份" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getProvinces(country).map((p) => (
+                          <SelectItem key={p.code} value={p.code}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

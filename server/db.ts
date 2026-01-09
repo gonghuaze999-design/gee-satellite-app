@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, exportTasks, ExportTask, InsertExportTask, drawnAreas, InsertDrawnArea, searchFilters, InsertSearchFilter, timeSeriesAnalysis, InsertTimeSeriesAnalysis } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,159 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ============ 导出任务相关函数 ============
+
+export async function createExportTask(task: InsertExportTask): Promise<ExportTask | null> {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot create export task: database not available");
+    return null;
+  }
+
+  try {
+    await db.insert(exportTasks).values(task);
+    const result = await db.select().from(exportTasks).where(eq(exportTasks.taskId, task.taskId)).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create export task:", error);
+    throw error;
+  }
+}
+
+export async function getExportTask(taskId: string): Promise<ExportTask | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select().from(exportTasks).where(eq(exportTasks.taskId, taskId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function updateExportTaskStatus(taskId: string, status: string, progress: number = 0, downloadUrl?: string, errorMessage?: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const updateData: any = { status, progress, updatedAt: new Date() };
+  if (downloadUrl) updateData.downloadUrl = downloadUrl;
+  if (errorMessage) updateData.errorMessage = errorMessage;
+  if (status === 'completed') updateData.completedAt = new Date();
+
+  await db.update(exportTasks).set(updateData).where(eq(exportTasks.taskId, taskId));
+}
+
+export async function getUserExportTasks(userId: number): Promise<ExportTask[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(exportTasks).where(eq(exportTasks.userId, userId));
+}
+
+// ============ 绘制区域相关函数 ============
+
+export async function createDrawnArea(area: InsertDrawnArea): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    await db.insert(drawnAreas).values(area);
+    const result = await db.select().from(drawnAreas).orderBy(drawnAreas.id).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create drawn area:", error);
+    throw error;
+  }
+}
+
+export async function getUserDrawnAreas(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(drawnAreas).where(eq(drawnAreas.userId, userId));
+}
+
+export async function updateDrawnArea(areaId: number, updates: any): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(drawnAreas).set({ ...updates, updatedAt: new Date() }).where(eq(drawnAreas.id, areaId));
+}
+
+export async function deleteDrawnArea(areaId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(drawnAreas).where(eq(drawnAreas.id, areaId));
+}
+
+// ============ 搜索过滤相关函数 ============
+
+export async function createSearchFilter(filter: InsertSearchFilter): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    await db.insert(searchFilters).values(filter);
+    const result = await db.select().from(searchFilters).orderBy(searchFilters.id).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create search filter:", error);
+    throw error;
+  }
+}
+
+export async function getUserSearchFilters(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(searchFilters).where(eq(searchFilters.userId, userId));
+}
+
+export async function updateSearchFilter(filterId: number, updates: any): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(searchFilters).set({ ...updates, updatedAt: new Date() }).where(eq(searchFilters.id, filterId));
+}
+
+export async function deleteSearchFilter(filterId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(searchFilters).where(eq(searchFilters.id, filterId));
+}
+
+// ============ 时间序列分析相关函数 ============
+
+export async function createTimeSeriesAnalysis(analysis: InsertTimeSeriesAnalysis): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+
+  try {
+    await db.insert(timeSeriesAnalysis).values(analysis);
+    const result = await db.select().from(timeSeriesAnalysis).orderBy(timeSeriesAnalysis.id).limit(1);
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("[Database] Failed to create time series analysis:", error);
+    throw error;
+  }
+}
+
+export async function getUserTimeSeriesAnalysis(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select().from(timeSeriesAnalysis).where(eq(timeSeriesAnalysis.userId, userId));
+}
+
+export async function updateTimeSeriesAnalysis(analysisId: number, updates: any): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(timeSeriesAnalysis).set({ ...updates, updatedAt: new Date() }).where(eq(timeSeriesAnalysis.id, analysisId));
+}
+
+export async function deleteTimeSeriesAnalysis(analysisId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.delete(timeSeriesAnalysis).where(eq(timeSeriesAnalysis.id, analysisId));
+}

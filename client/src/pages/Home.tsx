@@ -10,8 +10,8 @@ import { Loader2, MapPin, Calendar as CalendarIcon, Satellite, Download, Eye, In
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { MapView } from '@/components/Map';
-import { DrawingTools } from '@/components/DrawingTools';
-import { chinaProvinces, getDivisionCenter, getDivisionBounds, getCitiesByProvince, getDistrictsByCity } from '@/data/china-geo-data';
+import { SimpleDrawingTools } from '@/components/SimpleDrawingTools';
+import { chinaProvinces, getDivisionCenter, getCitiesByProvince, getDistrictsByCity } from '@/data/china-divisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,7 @@ export default function Home() {
   
   // 区域选择状态
   const [selectedProvince, setSelectedProvince] = useState('zhejiang');
+  const [provincesList, setProvincesList] = useState<any[]>([]);
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [cities, setCities] = useState<any[]>([]);
@@ -315,6 +316,7 @@ export default function Home() {
 
   // 初始化城市列表
   useEffect(() => {
+    setProvincesList(chinaProvinces.map(p => ({ code: p.code, name: p.name })));
     const provinceCities = getCitiesByProvince(selectedProvince);
     setCities(provinceCities);
   }, []);
@@ -360,7 +362,7 @@ export default function Home() {
                     <CardDescription>在地图上绘制自定义区域</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <DrawingTools map={mapRef.current} />
+                    <SimpleDrawingTools map={mapRef.current} />
                   </CardContent>
                 </Card>
 
@@ -378,7 +380,7 @@ export default function Home() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {chinaProvinces.map(p => (
+                          {provincesList.map(p => (
                             <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
                           ))}
                         </SelectContent>

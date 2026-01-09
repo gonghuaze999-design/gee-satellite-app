@@ -16,6 +16,7 @@ interface SentinelImage {
   sensor: string;
   resolution: number;
   ndvi?: number;
+  thumbnail?: string; // 缩略图URL
 }
 
 interface NDVIResult {
@@ -238,22 +239,39 @@ export const geeRouter = router({
  * 获取模拟的Sentinel-2影像列表
  */
 function getMockSentinelImages(): SentinelImage[] {
-  const baseDate = new Date('2024-01-01');
   const images: SentinelImage[] = [];
+  let imageIndex = 0;
 
-  for (let i = 0; i < 10; i++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() + i * 5);
+  // 生成全年数据：每月3-5张影像
+  for (let month = 0; month < 12; month++) {
+    const imagesPerMonth = 3 + Math.floor(Math.random() * 3); // 3-5张
     
-    images.push({
-      id: `S2_${date.toISOString().split('T')[0]}_${String(i).padStart(3, '0')}`,
-      date: date.toISOString().split('T')[0],
-      cloudCover: Math.random() * 30,
-      quality: 80 + Math.random() * 20,
-      sensor: i % 2 === 0 ? 'Sentinel-2A' : 'Sentinel-2B',
-      resolution: 10,
-      ndvi: 0.5 + Math.random() * 0.3,
-    });
+    for (let i = 0; i < imagesPerMonth; i++) {
+      const date = new Date(2024, month, 1 + i * 8);
+      const cloudCover = Math.random() * 30;
+      const quality = 80 + Math.random() * 20;
+      const sensor = imageIndex % 2 === 0 ? 'Sentinel-2A' : 'Sentinel-2B';
+      const ndvi = 0.4 + Math.random() * 0.4;
+      
+      // 生成缩略图：使用SVG渐变色代表不同的NDVI值
+      const hue = (ndvi - 0.4) * 300; // 从蓝色(240°)到红色(0°)
+      const colorStart = `hsl(${Math.round(hue)},100%,50%)`;
+      const colorEnd = `hsl(${Math.round(hue)},80%,60%)`;
+      const thumbnail = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:${colorStart}'/%3E%3Cstop offset='100%25' style='stop-color:${colorEnd}'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23g)'/%3E%3C/svg%3E`;
+      
+      images.push({
+        id: `S2_${date.toISOString().split('T')[0]}_${String(imageIndex).padStart(3, '0')}`,
+        date: date.toISOString().split('T')[0],
+        cloudCover: Math.round(cloudCover * 100) / 100,
+        quality: Math.round(quality * 100) / 100,
+        sensor,
+        resolution: 10,
+        ndvi: Math.round(ndvi * 100) / 100,
+        thumbnail,
+      });
+      
+      imageIndex++;
+    }
   }
 
   return images;

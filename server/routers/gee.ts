@@ -34,7 +34,14 @@ interface NDVIResult {
 function executePythonScript(scriptName: string, args: any): Promise<any> {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(process.cwd(), 'server', 'scripts', scriptName);
-    const python = spawn('python3', [scriptPath, JSON.stringify(args)]);
+    
+    // 传递环境变量，包括GEE_SERVICE_ACCOUNT_KEY
+    const env = {
+      ...process.env,
+      GEE_SERVICE_ACCOUNT_KEY: process.env.GEE_SERVICE_ACCOUNT_KEY,
+    };
+    
+    const python = spawn('python3', [scriptPath, JSON.stringify(args)], { env });
     
     let stdout = '';
     let stderr = '';

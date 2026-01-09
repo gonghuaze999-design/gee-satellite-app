@@ -2,7 +2,6 @@
 """
 查询Sentinel-2卫星影像
 从Google Earth Engine查询指定区域和时间范围内的Sentinel-2影像
-返回所有满足条件的数据（不限制数量）
 """
 
 import sys
@@ -33,20 +32,17 @@ def query_sentinel2(geometry, start_date, end_date, max_cloud_cover):
         # 修复PEM格式（Manus系统会移除PEM标记中的空格）
         if 'private_key' in gee_key:
             private_key = gee_key['private_key']
-            # 修复PEM标记格式
             private_key = private_key.replace('-----BEGINPRIVATEKEY-----', '-----BEGIN PRIVATE KEY-----')
             private_key = private_key.replace('-----ENDPRIVATEKEY-----', '-----END PRIVATE KEY-----')
             gee_key['private_key'] = private_key
         
-        # 使用临时文件进行认证（这是最可靠的方式）
+        # 使用临时文件进行认证
         temp_key_file = None
         try:
-            # 创建临时文件存储修复后的密钥
             with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
                 json.dump(gee_key, f)
                 temp_key_file = f.name
             
-            # 从临时文件读取并认证
             with open(temp_key_file) as f:
                 key_data = json.load(f)
             
@@ -55,14 +51,11 @@ def query_sentinel2(geometry, start_date, end_date, max_cloud_cover):
                 key_data=key_data['private_key']
             )
             ee.Initialize(credentials)
-            print(f"GEE认证成功: {gee_key.get('client_email')}", file=sys.stderr)
             
         except Exception as auth_error:
-            print(f"GEE认证失败: {auth_error}", file=sys.stderr)
             raise Exception(f"GEE初始化失败: {auth_error}")
         
         finally:
-            # 清理临时文件
             if temp_key_file and os.path.exists(temp_key_file):
                 try:
                     os.unlink(temp_key_file)
@@ -78,26 +71,30 @@ def query_sentinel2(geometry, start_date, end_date, max_cloud_cover):
                 coords = geometry['coordinates']
                 geom = ee.Geometry.Point(coords).buffer(500)
             else:
-                geom = ee.Geometry.Rectangle(geometry.get('coordinates', [100, 25, 120, 35]))
+                geom = ee.Geometry.Rectangle(geometry.get('coordinates', [116.4, 39.9, 116.7, 40.2]))
         else:
-            # 默认使用浙江省范围
-            geom = ee.Geometry.Rectangle([118.0, 27.0, 123.0, 34.8])
+            # 默认使用北京市朝阳区范围
+            geom = ee.Geometry.Rectangle([116.4, 39.9, 116.7, 40.2])
         
         # 查询Sentinel-2数据
         sentinel2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
             .filterBounds(geom) \
             .filterDate(start_date, end_date) \
             .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', max_cloud_cover)) \
-            .sort('system:time_start')
+            .sort('system:time_start', False)
         
         # 获取影像总数
-        size = sentinel2.size().getInfo()
-        print(f"Found {size} images matching criteria", file=sys.stderr)
+        total_size = sentinel2.size().getInfo()
+        print(f"[DEBUG] 找到 {total_size} 张影像", file=sys.stderr)
         
-        # 获取所有影像列表
-        image_list = sentinel2.toList(sentinel2.size()).getInfo()
+        # 返回所有数据（不限制数量）
+        max_return = total_size
         
-        # 处理结果
+        # 获取影像列表
+        image_list = sentinel2.toList(max_return).getInfo()
+        print(f"[DEBUG] 准备返回 {len(image_list)} 张影像", file=sys.stderr)
+        
+        # 处理结果 - 只返回元数据，不生成缩略图和NDVI
         results = []
         for i, image_info in enumerate(image_list):
             try:
@@ -113,55 +110,48 @@ def query_sentinel2(geometry, start_date, end_date, max_cloud_cover):
                 # 获取传感器信息
                 platform = properties.get('PLATFORM_NAME', 'Sentinel-2')
                 
-                # 生成缩略图
-                thumbnail_url = f"data:image/png;base64,{generate_thumbnail_base64(i)}"
+                # 获取影像ID
+                image_id = image_info.get('id', f'S2_{date_str}_{i:03d}')
                 
-                # 计算NDVI（简化实现）
-                ndvi = 0.5 + (hash(str(image_info)) % 100) / 200
+                # 生成缩略图URL（使用GEE的getThumbURL）
+                try:
+                    image = ee.Image(image_id)
+                    thumbnail_url = image.getThumbURL({
+                        'min': 0,
+                        'max': 3000,
+                        'bands': ['B4', 'B3', 'B2'],
+                        'region': geom,
+                        'dimensions': 100,
+                        'format': 'png'
+                    })
+                except Exception as thumb_error:
+                    # 如果缩略图生成失败，使用占位符
+                    colors = ['FFD700', 'FFA500', 'FF6347', '32CD32', '00CED1', '4169E1', 'FF1493', '00FF00']
+                    color = colors[i % len(colors)]
+                    thumbnail_url = f"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23{color}' width='100' height='100'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='white' font-size='12'%3E{date_str}%3C/text%3E%3C/svg%3E"
                 
                 result = {
-                    'id': f"S2_{date_str}_{i:03d}",
+                    'id': image_id,
                     'date': date_str,
-                    'cloudCover': round(cloud_cover, 2),
-                    'quality': round(quality, 2),
+                    'cloudCover': round(float(cloud_cover), 2),
+                    'quality': round(float(quality), 2),
                     'sensor': platform,
                     'resolution': 10,
-                    'ndvi': round(ndvi, 2),
+                    'ndvi': None,  # 延迟计算
                     'thumbnail': thumbnail_url,
                 }
                 
                 results.append(result)
                 
             except Exception as e:
-                print(f"Warning: Failed to process image {i}: {e}", file=sys.stderr)
+                print(f"[DEBUG] 处理影像失败: {e}", file=sys.stderr)
                 continue
         
+        print(f"[DEBUG] 返回 {len(results)} 张影像", file=sys.stderr)
         return results
         
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
         raise
-
-def generate_thumbnail_base64(index):
-    """生成缩略图的Base64编码"""
-    colors = ['FFD700', 'FFA500', 'FF6347', '32CD32', '00CED1', '4169E1']
-    color = colors[index % len(colors)]
-    
-    # 返回一个1x1像素的PNG
-    import base64
-    png_data = bytes([
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
-        0x54, 0x08, 0x99, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-        0x00, 0x00, 0x03, 0x00, 0x01, 0x3B, 0xB6, 0xEE,
-        0x56, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-        0x44, 0xAE, 0x42, 0x60, 0x82
-    ])
-    
-    return base64.b64encode(png_data).decode('utf-8')
 
 if __name__ == '__main__':
     try:
@@ -174,6 +164,8 @@ if __name__ == '__main__':
         start_date = args.get('startDate', '2024-01-01')
         end_date = args.get('endDate', '2024-12-31')
         max_cloud_cover = args.get('maxCloudCover', 30)
+        
+        print(f"[DEBUG] 开始查询: {start_date} 到 {end_date}, 云量 < {max_cloud_cover}%", file=sys.stderr)
         
         # 查询数据
         results = query_sentinel2(geometry, start_date, end_date, max_cloud_cover)

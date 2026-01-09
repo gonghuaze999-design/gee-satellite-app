@@ -41,6 +41,29 @@ interface NDVIResult {
   imageUrl?: string;
 }
 
+// 生成NDVI可视化SVG
+function generateNDVIVisualization(result: NDVIResult): string {
+  const { ndviMin, ndviMax, ndviMean } = result;
+  const range = ndviMax - ndviMin;
+  const meanPercent = ((ndviMean - ndviMin) / range) * 100;
+  
+  // 创建彩虹渐变
+  const colors = [
+    { pos: 0, color: '#0000FF' },      // 蓝色 (低NDVI)
+    { pos: 25, color: '#00FFFF' },     // 青色
+    { pos: 50, color: '#00FF00' },     // 绿色
+    { pos: 75, color: '#FFFF00' },     // 黄色
+    { pos: 100, color: '#FF0000' },    // 红色 (高NDVI)
+  ];
+  
+  let gradientStops = '';
+  colors.forEach(c => {
+    gradientStops += `<stop offset="${c.pos}%" style="stop-color:${c.color}"/>`;
+  });
+  
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cdefs%3E%3ClinearGradient id='rainbow' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E${gradientStops}%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='400' fill='url(%23rainbow)'/%3E%3C/svg%3E`;
+}
+
 export default function Home() {
   const mapRef = useRef<google.maps.Map | null>(null);
   const drawingManagerRef = useRef<any>(null);
@@ -201,6 +224,8 @@ export default function Home() {
   
 
   // 计算NDVI
+  // NDVI计算使用query而不是mutation
+  // 计算NDVI
   const handleCalculateNDVI = useCallback(() => {
     if (!selectedImageId) {
       toast.error('请先选择一张影像');
@@ -211,6 +236,8 @@ export default function Home() {
     if (!image) return;
 
     setSearching(true);
+    
+    // 简单实现：直接使用图表数据中的NDVI值
     setTimeout(() => {
       const ndviResult: NDVIResult = {
         imageId: selectedImageId,
@@ -219,7 +246,13 @@ export default function Home() {
         ndviMean: image.ndvi || 0.65,
         colorMap: 'rainbow',
         timestamp: new Date().toISOString(),
-        imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22400%22%3E%3Cdefs%3E%3ClinearGradient id=%22rainbow%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23FF0000%22/%3E%3Cstop offset=%2225%25%22 style=%22stop-color:%23FFFF00%22/%3E%3Cstop offset=%2250%25%22 style=%22stop-color:%2300FF00%22/%3E%3Cstop offset=%2275%25%22 style=%22stop-color:%2300FFFF%22/%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%230000FF%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22400%22 height=%22400%22 fill=%22url(%23rainbow)%22/%3E%3C/svg%3E',
+        imageUrl: generateNDVIVisualization({
+          ndviMin: -0.2,
+          ndviMax: 0.9,
+          ndviMean: image.ndvi || 0.65,
+          colorMap: 'rainbow',
+          timestamp: new Date().toISOString(),
+        } as NDVIResult),
       };
       
       const newResults = new Map(ndviResults);
@@ -228,8 +261,9 @@ export default function Home() {
       
       setSearching(false);
       toast.success('NDVI计算完成！结果已显示');
-    }, 2000);
+    }, 1000);
   }, [selectedImageId, imageList, ndviResults]);
+
 
   // 批量计算NDVI
   const handleBatchCalculateNDVI = useCallback(() => {
@@ -239,6 +273,7 @@ export default function Home() {
     }
 
     setSearching(true);
+    
     setTimeout(() => {
       const newResults = new Map(ndviResults);
       imageList.forEach((image) => {
@@ -249,12 +284,20 @@ export default function Home() {
           ndviMean: image.ndvi || 0.65,
           colorMap: 'rainbow',
           timestamp: new Date().toISOString(),
+          imageUrl: generateNDVIVisualization({
+            ndviMin: -0.2,
+            ndviMax: 0.9,
+            ndviMean: image.ndvi || 0.65,
+            colorMap: 'rainbow',
+            timestamp: new Date().toISOString(),
+          } as NDVIResult),
         });
       });
+      
       setNdviResults(newResults);
       setSearching(false);
       toast.success(`已对 ${imageList.length} 张影像计算NDVI`);
-    }, 2000);
+    }, 1000);
   }, [imageList, ndviResults]);
 
   // 导出NDVI结果

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, Loader2 } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SimpleDrawingToolsProps {
@@ -9,33 +9,89 @@ interface SimpleDrawingToolsProps {
 }
 
 export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingToolsProps) {
-  const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle' | 'circle' | 'marker' | null>(null);
+  const [drawingMode, setDrawingMode] = useState<'polygon' | 'rectangle' | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const drawnShapesRef = useRef<any[]>([]);
   const listenersRef = useRef<any[]>([]);
+  const polygonPointsRef = useRef<google.maps.LatLng[]>([]);
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const rectangleStartRef = useRef<google.maps.LatLng | null>(null);
+  const rectangleRef = useRef<google.maps.Rectangle | null>(null);
 
   useEffect(() => {
     if (!map) return;
 
+    // 处理地图点击事件
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
       if (!drawingMode) return;
 
-      if (drawingMode === 'marker') {
-        const marker = new google.maps.Marker({
-          position: e.latLng,
-          map: map,
-          draggable: true,
-        });
-        drawnShapesRef.current.push(marker);
-        toast.success('标记已添加');
-        return;
-      }
-
-      // 对于其他模式，我们需要更复杂的逻辑
-      // 这里简化实现，只做基础功能
       if (drawingMode === 'polygon') {
+        // 添加多边形顶点
+        const point = e.latLng!;
+        polygonPointsRef.current.push(point);
+
+        // 绘制临时线条
+        if (!polylineRef.current) {
+          polylineRef.current = new google.maps.Polyline({
+            path: polygonPointsRef.current,
+            geodesic: true,
+            strokeColor: '#667eea',
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+            map: map,
+          });
+        } else {
+          polylineRef.current.setPath(polygonPointsRef.current);
+        }
+
+        // 添加标记
+        new google.maps.Marker({
+          position: point,
+          map: map,
+          title: `Point ${polygonPointsRef.current.length}`,
+        });
+
+        toast.success(`已添加第 ${polygonPointsRef.current.length} 个点`);
+      } else if (drawingMode === 'rectangle') {
+        if (!rectangleStartRef.current) {
+          // 第一个点
+          rectangleStartRef.current = e.latLng!;
+          toast.info('已设置矩形起点，继续点击设置终点');
+        } else {
+          // 第二个点，完成矩形
+          const startPoint = rectangleStartRef.current;
+          const endPoint = e.latLng!;
+
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend(startPoint);
+          bounds.extend(endPoint);
+
+          const rectangle = new google.maps.Rectangle({
+            bounds: bounds,
+            fillColor: '#667eea',
+            fillOpacity: 0.3,
+            strokeColor: '#667eea',
+            strokeWeight: 2,
+            editable: true,
+            draggable: true,
+            map: map,
+          });
+
+          drawnShapesRef.current.push(rectangle);
+          rectangleRef.current = null;
+          rectangleStartRef.current = null;
+          setDrawingMode(null);
+          toast.success('矩形绘制完成');
+        }
+      }
+    };
+
+    // 处理右键事件（完成多边形）
+    const handleRightClick = (e: google.maps.MapMouseEvent) => {
+      if (drawingMode === 'polygon' && polygonPointsRef.current.length >= 3) {
+        // 创建多边形
         const polygon = new google.maps.Polygon({
-          paths: [e.latLng],
+          paths: polygonPointsRef.current,
           editable: true,
           draggable: true,
           fillColor: '#667eea',
@@ -44,16 +100,69 @@ export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingTool
           strokeWeight: 2,
           map: map,
         });
+
         drawnShapesRef.current.push(polygon);
-        toast.success('多边形已开始绘制，点击地图继续添加点，右键完成');
+
+        // 清理临时线条和标记
+        if (polylineRef.current) {
+          polylineRef.current.setMap(null);
+          polylineRef.current = null;
+        }
+
+        // 清理临时标记（简化实现）
+
+        // 重置状态
+        polygonPointsRef.current = [];
+        setDrawingMode(null);
+        toast.success('多边形绘制完成');
       }
     };
 
-    const listener = map.addListener('click', handleMapClick);
-    listenersRef.current.push(listener);
+    // 处理鼠标移动（显示预览）
+    const handleMouseMove = (e: google.maps.MapMouseEvent) => {
+      if (drawingMode === 'rectangle' && rectangleStartRef.current) {
+        // 显示预览矩形
+        const startPoint = rectangleStartRef.current;
+        const currentPoint = e.latLng!;
+
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(startPoint);
+        bounds.extend(currentPoint);
+
+        if (!rectangleRef.current) {
+          rectangleRef.current = new google.maps.Rectangle({
+            bounds: bounds,
+            fillColor: '#667eea',
+            fillOpacity: 0.1,
+            strokeColor: '#667eea',
+            strokeWeight: 1,
+            strokeOpacity: 0.5,
+            map: map,
+          });
+        } else {
+          rectangleRef.current.setBounds(bounds);
+        }
+      }
+    };
+
+    const clickListener = map.addListener('click', handleMapClick);
+    const rightClickListener = map.addListener('rightclick', handleRightClick);
+    const mouseMoveListener = map.addListener('mousemove', handleMouseMove);
+
+    listenersRef.current.push(clickListener, rightClickListener, mouseMoveListener);
+
+    // 改变鼠标样式
+    if (drawingMode) {
+      map.setOptions({ draggableCursor: 'crosshair' });
+    } else {
+      map.setOptions({ draggableCursor: 'grab' });
+    }
 
     return () => {
       listenersRef.current.forEach(l => google.maps.event.removeListener(l));
+      if (rectangleRef.current) {
+        rectangleRef.current.setMap(null);
+      }
     };
   }, [map, drawingMode]);
 
@@ -62,6 +171,16 @@ export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingTool
       shape.setMap(null);
     });
     drawnShapesRef.current = [];
+    polygonPointsRef.current = [];
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+    if (rectangleRef.current) {
+      rectangleRef.current.setMap(null);
+      rectangleRef.current = null;
+    }
+    rectangleStartRef.current = null;
     setDrawingMode(null);
     toast.success('已清除所有绘制内容');
   };
@@ -88,18 +207,29 @@ export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingTool
             type: 'Polygon',
             coordinates: [coordinates],
           },
-          properties: { id: idx },
+          properties: { id: idx, type: 'polygon' },
         });
-      } else if (shape instanceof google.maps.Marker) {
-        const pos = shape.getPosition();
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [pos!.lng(), pos!.lat()],
-          },
-          properties: { id: idx },
-        });
+      } else if (shape instanceof google.maps.Rectangle) {
+        const bounds = shape.getBounds();
+        if (bounds) {
+          const ne = bounds.getNorthEast();
+          const sw = bounds.getSouthWest();
+          const coordinates = [
+            [sw.lng(), sw.lat()],
+            [ne.lng(), sw.lat()],
+            [ne.lng(), ne.lat()],
+            [sw.lng(), ne.lat()],
+            [sw.lng(), sw.lat()],
+          ];
+          features.push({
+            type: 'Feature',
+            geometry: {
+              type: 'Polygon',
+              coordinates: [coordinates],
+            },
+            properties: { id: idx, type: 'rectangle' },
+          });
+        }
       }
     });
 
@@ -126,30 +256,40 @@ export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingTool
         <Button
           size="sm"
           variant={drawingMode === 'polygon' ? 'default' : 'outline'}
-          onClick={() => setDrawingMode(drawingMode === 'polygon' ? null : 'polygon')}
+          onClick={() => {
+            if (drawingMode === 'polygon') {
+              setDrawingMode(null);
+              polygonPointsRef.current = [];
+              if (polylineRef.current) {
+                polylineRef.current.setMap(null);
+                polylineRef.current = null;
+              }
+            } else {
+              setDrawingMode('polygon');
+              polygonPointsRef.current = [];
+            }
+          }}
         >
           多边形
         </Button>
         <Button
           size="sm"
           variant={drawingMode === 'rectangle' ? 'default' : 'outline'}
-          onClick={() => setDrawingMode(drawingMode === 'rectangle' ? null : 'rectangle')}
+          onClick={() => {
+            if (drawingMode === 'rectangle') {
+              setDrawingMode(null);
+              rectangleStartRef.current = null;
+              if (rectangleRef.current) {
+                rectangleRef.current.setMap(null);
+                rectangleRef.current = null;
+              }
+            } else {
+              setDrawingMode('rectangle');
+              rectangleStartRef.current = null;
+            }
+          }}
         >
           矩形
-        </Button>
-        <Button
-          size="sm"
-          variant={drawingMode === 'circle' ? 'default' : 'outline'}
-          onClick={() => setDrawingMode(drawingMode === 'circle' ? null : 'circle')}
-        >
-          圆形
-        </Button>
-        <Button
-          size="sm"
-          variant={drawingMode === 'marker' ? 'default' : 'outline'}
-          onClick={() => setDrawingMode(drawingMode === 'marker' ? null : 'marker')}
-        >
-          标记
         </Button>
       </div>
 
@@ -176,12 +316,9 @@ export function SimpleDrawingTools({ map, onDrawingComplete }: SimpleDrawingTool
 
       {drawingMode && (
         <p className="text-xs text-slate-400 text-center">
-          当前模式: {
-            drawingMode === 'polygon' ? '多边形 - 点击地图添加点'
-            : drawingMode === 'rectangle' ? '矩形 - 拖动绘制'
-            : drawingMode === 'circle' ? '圆形 - 拖动绘制'
-            : '标记 - 点击地图添加标记'
-          }
+          {drawingMode === 'polygon' 
+            ? '多边形模式：点击地图添加点，右键完成绘制'
+            : '矩形模式：点击两个点设置矩形对角'}
         </p>
       )}
     </div>

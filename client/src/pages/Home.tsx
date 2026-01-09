@@ -11,6 +11,7 @@ import { Loader2, MapPin, Calendar as CalendarIcon, Satellite, Download, Eye, In
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { MapView } from "@/components/Map";
+import { DrawingTools } from "@/components/DrawingTools";
 
 interface ImageInfo {
   id: string;
@@ -37,6 +38,10 @@ export default function Home() {
   
   // 当前图层
   const [currentOverlay, setCurrentOverlay] = useState<google.maps.ImageMapType | null>(null);
+  
+  // 绘制区域
+  const [drawnGeometry, setDrawnGeometry] = useState<any>(null);
+  const [useDrawnArea, setUseDrawnArea] = useState(false);
 
   // 加载Earth Engine（可选）
   useEffect(() => {
@@ -378,6 +383,19 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* 左侧控制面板 */}
           <div className="lg:col-span-1 space-y-4">
+            {/* 地图绘制 */}
+            <DrawingTools 
+              map={mapRef.current}
+              onDrawingComplete={(geometry) => {
+                setDrawnGeometry(geometry);
+                setUseDrawnArea(true);
+              }}
+              onDrawingCleared={() => {
+                setDrawnGeometry(null);
+                setUseDrawnArea(false);
+              }}
+            />
+
             {/* 区域选择 */}
             <Card>
               <CardHeader>
@@ -385,7 +403,9 @@ export default function Home() {
                   <MapPin className="h-5 w-5" />
                   区域选择
                 </CardTitle>
-                <CardDescription>选择行政区划范围</CardDescription>
+                <CardDescription>
+                  {useDrawnArea ? '已使用绘制区域' : '选择行政区划范围'}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>

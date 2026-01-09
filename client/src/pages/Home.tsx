@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { trpc } from '@/lib/trpc';
 
 interface SatelliteImage {
   id: string;
@@ -163,71 +164,41 @@ export default function Home() {
     }
   }, []);
 
-  // 搜索卫星影像
+  // 查询Sentinel-2数据 - 使用mutation
+  const searchMutation = trpc.gee.searchSentinel2.useMutation({
+    onSuccess: (result: any) => {
+      setImageList(result);
+      setSearching(false);
+      toast.success(`找到 ${result.length} 张符合条件的Sentinel-2影像`);
+    },
+    onError: (error: any) => {
+      console.error('搜索失败:', error);
+      setSearching(false);
+      toast.error('搜索卫星影像失败，请检查网络连接');
+    },
+  });
+  
   const handleSearch = useCallback(() => {
     setSearching(true);
     
-    // 模拟搜索延迟
-    setTimeout(() => {
-      const mockImages: SatelliteImage[] = [
-        {
-          id: 'S2_20240115_001',
-          date: '2024-01-15',
-          cloudCover: 5,
-          quality: 95,
-          sensor: 'Sentinel-2A',
-          resolution: 10,
-          thumbnail: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23228B22%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E',
-          ndvi: 0.65,
-        },
-        {
-          id: 'S2_20240120_002',
-          date: '2024-01-20',
-          cloudCover: 12,
-          quality: 88,
-          sensor: 'Sentinel-2B',
-          resolution: 10,
-          thumbnail: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23228B22%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E',
-          ndvi: 0.62,
-        },
-        {
-          id: 'S2_20240205_003',
-          date: '2024-02-05',
-          cloudCover: 25,
-          quality: 82,
-          sensor: 'Sentinel-2A',
-          resolution: 10,
-          thumbnail: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23FFD700%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E',
-          ndvi: 0.68,
-        },
-        {
-          id: 'S2_20240215_004',
-          date: '2024-02-15',
-          cloudCover: 8,
-          quality: 92,
-          sensor: 'Sentinel-2B',
-          resolution: 10,
-          thumbnail: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23228B22%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E',
-          ndvi: 0.71,
-        },
-        {
-          id: 'S2_20240301_005',
-          date: '2024-03-01',
-          cloudCover: 15,
-          quality: 85,
-          sensor: 'Sentinel-2A',
-          resolution: 10,
-          thumbnail: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22%3E%3Crect fill=%22%23228B22%22 width=%22100%22 height=%22100%22/%3E%3C/svg%3E',
-          ndvi: 0.75,
-        },
-      ];
-      
-      const filtered = mockImages.filter(img => img.cloudCover <= maxCloudCover);
-      setImageList(filtered);
-      setSearching(false);
-      toast.success(`找到 ${filtered.length} 张符合条件的Sentinel-2影像`);
-    }, 1500);
-  }, [maxCloudCover]);
+    // 构建几何体
+    const geometry = {
+      type: 'Point',
+      coordinates: [120.15, 30.27], // 杭州坐标
+    };
+    
+    // 调用mutation
+    searchMutation.mutate({
+      geometry,
+      startDate,
+      endDate,
+      maxCloudCover,
+    });
+  }, [startDate, endDate, maxCloudCover, searchMutation]);
+  
+  // 使用tRPC查询GEE认证状态
+  const { data: geeAuthStatus } = trpc.gee.checkAuth.useQuery();
+  
 
   // 计算NDVI
   const handleCalculateNDVI = useCallback(() => {

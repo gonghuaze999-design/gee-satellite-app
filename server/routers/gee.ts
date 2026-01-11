@@ -4,7 +4,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { queryQueue } from '../services/queryQueue';
-import { chinaAdministrationComplete } from '../data/chinaAdministrationComplete';
+import { chinaAdministration } from '../data/chinaAdministration';
 
 function getGeeServiceAccountKey(): string {
   const geeKeyPath = '/tmp/gee_service_account_key.json';
@@ -89,20 +89,20 @@ function getGeometryFromAdminDivision(province?: string, city?: string, district
   let targetLng = 116.4074;
   
   // 优先使用区县，其次使用城市，最后使用省份
-  if (district && district.trim()) {
-    const districtData = chinaAdministrationComplete.districts.find((d: any) => d.name === district);
+  if (district) {
+    const districtData = chinaAdministration.districts.find((d: any) => d.name === district);
     if (districtData && districtData.lat && districtData.lng) {
       targetLat = districtData.lat;
       targetLng = districtData.lng;
     }
-  } else if (city && city.trim()) {
-    const cityData = chinaAdministrationComplete.cities.find((c: any) => c.name === city);
+  } else if (city) {
+    const cityData = chinaAdministration.cities.find((c: any) => c.name === city);
     if (cityData && cityData.lat && cityData.lng) {
       targetLat = cityData.lat;
       targetLng = cityData.lng;
     }
-  } else if (province && province.trim()) {
-    const provinceData = chinaAdministrationComplete.provinces.find((p: any) => p.name === province);
+  } else if (province) {
+    const provinceData = chinaAdministration.provinces.find((p: any) => p.name === province);
     if (provinceData && provinceData.lat && provinceData.lng) {
       targetLat = provinceData.lat;
       targetLng = provinceData.lng;
@@ -111,11 +111,11 @@ function getGeometryFromAdminDivision(province?: string, city?: string, district
   
   // 根据地区级别设置查询范围（单位：度）
   let rangeOffset = 0.15; // 默认范围（约16km）
-  if (district && district.trim()) {
+  if (district) {
     rangeOffset = 0.05; // 区县范围较小
-  } else if (city && city.trim()) {
+  } else if (city) {
     rangeOffset = 0.1; // 城市范围中等
-  } else if (province && province.trim()) {
+  } else if (province) {
     rangeOffset = 0.3; // 省份范围较大
   }
   

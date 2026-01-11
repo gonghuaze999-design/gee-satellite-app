@@ -138,7 +138,63 @@ export default function Home() {
 
   const handleMapReady = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
+    // 设置默认中心到北京
+    map.setCenter({ lat: 39.9042, lng: 116.4074 });
+    map.setZoom(10);
   }, []);
+
+  // 当选择的地区改变时，自动定位地图
+  useEffect(() => {
+    if (mapRef.current && selectedDistrictAdcode) {
+      // 根据选中的区县获取其坐标并定位地图
+      const district = districtsList.find(d => d.adcode === selectedDistrictAdcode);
+      if (district && district.location) {
+        const [lng, lat] = district.location.split(',').map(Number);
+        mapRef.current.setCenter({ lat, lng });
+        mapRef.current.setZoom(12);
+      } else if (selectedCityAdcode) {
+        // 如果没有区县坐标，则使用城市坐标
+        const city = citiesList.find(c => c.adcode === selectedCityAdcode);
+        if (city && city.location) {
+          const [lng, lat] = city.location.split(',').map(Number);
+          mapRef.current.setCenter({ lat, lng });
+          mapRef.current.setZoom(11);
+        } else if (selectedProvinceAdcode) {
+          // 如果没有城市坐标，则使用省份坐标
+          const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
+          if (province && province.location) {
+            const [lng, lat] = province.location.split(',').map(Number);
+            mapRef.current.setCenter({ lat, lng });
+            mapRef.current.setZoom(9);
+          }
+        }
+      }
+    }
+  }, [selectedDistrictAdcode, selectedCityAdcode, selectedProvinceAdcode, districtsList, citiesList, provincesList]);
+
+  // 当城市改变时，自动定位地图
+  useEffect(() => {
+    if (mapRef.current && selectedCityAdcode && !selectedDistrictAdcode) {
+      const city = citiesList.find(c => c.adcode === selectedCityAdcode);
+      if (city && city.location) {
+        const [lng, lat] = city.location.split(',').map(Number);
+        mapRef.current.setCenter({ lat, lng });
+        mapRef.current.setZoom(11);
+      }
+    }
+  }, [selectedCityAdcode, citiesList, selectedDistrictAdcode]);
+
+  // 当省份改变时，自动定位地图
+  useEffect(() => {
+    if (mapRef.current && selectedProvinceAdcode && !selectedCityAdcode) {
+      const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
+      if (province && province.location) {
+        const [lng, lat] = province.location.split(',').map(Number);
+        mapRef.current.setCenter({ lat, lng });
+        mapRef.current.setZoom(9);
+      }
+    }
+  }, [selectedProvinceAdcode, provincesList, selectedCityAdcode]);
 
   const handleSearch = useCallback(() => {
     setImageList([]);

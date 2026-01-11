@@ -76,8 +76,7 @@
 
 /// <reference types="@types/google.maps" />
 
-import { useEffect, useRef } from "react";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 declare global {
@@ -93,7 +92,7 @@ const FORGE_BASE_URL =
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
 
 function loadMapScript() {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
     script.async = true;
@@ -104,6 +103,7 @@ function loadMapScript() {
     };
     script.onerror = () => {
       console.error("Failed to load Google Maps script");
+      reject(new Error("Failed to load Google Maps script"));
     };
     document.head.appendChild(script);
   });
@@ -124,37 +124,59 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
 
-  const init = usePersistFn(async () => {
-    await loadMapScript();
+  const init = useCallback(async () => {
+    try {
+      await loadMapScript();
+    } catch (error) {
+      console.error("Map initialization failed:", error);
+      setMapError("地图加载失败，请检查网络连接或稍后重试");
+      return;
+    }
     if (!mapContainer.current) {
       console.error("Map container not found");
       return;
     }
-    map.current = new window.google.maps.Map(mapContainer.current, {
-      zoom: initialZoom,
-      center: initialCenter,
-      mapTypeId: window.google.maps.MapTypeId.SATELLITE,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      streetViewControl: true,
-      mapId: "DEMO_MAP_ID",
-    });
-    // 设置默认为卫星地图
-    if (map.current) {
-      map.current.setMapTypeId(window.google.maps.MapTypeId.SATELLITE);
+    try {
+      map.current = new window.google.maps.Map(mapContainer.current, {
+        zoom: initialZoom,
+        center: initialCenter,
+        mapTypeId: window.google.maps.MapTypeId.SATELLITE,
+        mapTypeControl: true,
+        fullscreenControl: true,
+        zoomControl: true,
+        streetViewControl: true,
+        mapId: "DEMO_MAP_ID",
+      });
+      // 设置默认为卫星地图
+      if (map.current) {
+        map.current.setMapTypeId(window.google.maps.MapTypeId.SATELLITE);
+      }
+      if (onMapReady) {
+        onMapReady(map.current);
+      }
+    } catch (error) {
+      console.error("Failed to initialize map:", error);
+      setMapError("地图初始化失败");
     }
-    if (onMapReady) {
-      onMapReady(map.current);
-    }
-  });
+  }, [initialZoom, initialCenter, onMapReady]);
 
   useEffect(() => {
     init();
-  }, [init]);
+  }, [init, initialZoom, initialCenter, onMapReady]);
 
   return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
+    <div className={cn("w-full h-[500px] relative", className)}>
+      <div ref={mapContainer} className="w-full h-full" />
+      {mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-700 bg-opacity-90 rounded">
+          <div className="text-center space-y-4">
+            <p className="text-white text-lg font-semibold">⚠️ {mapError}</p>
+            <p className="text-gray-300 text-sm">地图功能暂时不可用，但您仍可以使用其他功能进行卫星影像查询</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

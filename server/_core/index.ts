@@ -1,4 +1,22 @@
-import "dotenv/config";
+import fs from 'fs';
+import path from 'path';
+
+console.log('[SERVER-INIT] GEE_SERVICE_ACCOUNT_KEY length:', (process.env.GEE_SERVICE_ACCOUNT_KEY || '').length);
+console.log('[SERVER-INIT] All env keys:', Object.keys(process.env).filter(k => k.includes('GEE')).length);
+
+(global as any).GEE_SERVICE_ACCOUNT_KEY = process.env.GEE_SERVICE_ACCOUNT_KEY || '';
+console.log('[SERVER-INIT] Global GEE_SERVICE_ACCOUNT_KEY set:', ((global as any).GEE_SERVICE_ACCOUNT_KEY || '').length);
+
+const geeKeyPath = '/tmp/gee_service_account_key.json';
+if (process.env.GEE_SERVICE_ACCOUNT_KEY) {
+  try {
+    fs.writeFileSync(geeKeyPath, process.env.GEE_SERVICE_ACCOUNT_KEY);
+    console.log('[SERVER-INIT] GEE key saved to', geeKeyPath);
+  } catch (e) {
+    console.error('[SERVER-INIT] Failed to save GEE key:', e);
+  }
+}
+
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -49,14 +67,7 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
-
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
+  const port = await findAvailablePort();
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });

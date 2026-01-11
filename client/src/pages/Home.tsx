@@ -8,6 +8,7 @@ import { Loader2, Satellite, Cloud, Calendar as CalendarIcon } from 'lucide-reac
 import { toast } from 'sonner';
 import { MapView } from '@/components/Map';
 import { QueryProgress } from '@/components/QueryProgress';
+import { ImageDetailPanel } from '@/components/ImageDetailPanel';
 import { useAsyncQuery } from '@/hooks/useAsyncQuery';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
@@ -52,6 +53,8 @@ export default function Home() {
   
   const [imageList, setImageList] = useState<SatelliteImage[]>([]);
   const [selectedImageId, setSelectedImageId] = useState<string>('');
+  const [selectedImage, setSelectedImage] = useState<SatelliteImage | null>(null);
+  const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   
   const { status: queryStatus, isLoading, cancel } = useAsyncQuery({
@@ -218,6 +221,12 @@ export default function Home() {
 
   const handleImageSelect = useCallback((image: SatelliteImage) => {
     setSelectedImageId(image.id);
+    setSelectedImage(image);
+    setShowDetailPanel(true);
+  }, []);
+
+  const handleLoadToMap = useCallback((image: SatelliteImage) => {
+    toast.info(`已将 ${image.date} 的影像加载到地图`);
   }, []);
 
   return (
@@ -414,6 +423,15 @@ export default function Home() {
                 </CardContent>
               </Card>
             )}
+
+        {/* 影像详情面板 */}
+        {showDetailPanel && (
+          <ImageDetailPanel
+            image={selectedImage}
+            onClose={() => setShowDetailPanel(false)}
+            onLoadToMap={handleLoadToMap}
+          />
+        )}
 
             {!isLoading && imageList.length === 0 && !queryStatus && (
               <Card className="bg-slate-800 border-slate-700">

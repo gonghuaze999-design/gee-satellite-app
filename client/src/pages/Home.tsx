@@ -9,12 +9,19 @@ import { toast } from 'sonner';
 import { MapView } from '@/components/Map';
 import { QueryProgress } from '@/components/QueryProgress';
 import { useAsyncQuery } from '@/hooks/useAsyncQuery';
-import { chinaProvinces } from '@/data/china-divisions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { trpc } from '@/lib/trpc';
+
+
+interface AdministrativeDivision {
+  name: string;
+  adcode: string;
+  level: string;
+  location?: string;
+}
 
 interface SatelliteImage {
   id: string;
@@ -31,9 +38,14 @@ interface SatelliteImage {
 export default function Home() {
   const mapRef = useRef<google.maps.Map | null>(null);
   
-  const [selectedProvince, setSelectedProvince] = useState('beijing');
-  const [selectedCity, setSelectedCity] = useState('beijing');
-  const [selectedDistrict, setSelectedDistrict] = useState('chaoyang');
+  const [selectedProvinceAdcode, setSelectedProvinceAdcode] = useState('110000');
+  const [selectedCityAdcode, setSelectedCityAdcode] = useState('110100');
+  const [selectedDistrictAdcode, setSelectedDistrictAdcode] = useState('');
+  
+  const [provincesList, setProvincesList] = useState<AdministrativeDivision[]>([]);
+  const [citiesList, setCitiesList] = useState<AdministrativeDivision[]>([]);
+  const [districtsList, setDistrictsList] = useState<AdministrativeDivision[]>([]);
+  
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState('2024-06-30');
   const [maxCloudCover, setMaxCloudCover] = useState(30);
@@ -56,6 +68,62 @@ export default function Home() {
   });
   
   const { data: geeAuthStatus } = trpc.gee.checkAuth.useQuery();
+  
+  // 获取省份列表
+  const { data: provincesData } = trpc.amap.getProvinces.useQuery();
+  
+  // 获取城市列表
+  const getCitiesMutation = trpc.amap.getCitiesByProvince.useMutation();
+  
+  // 获取区县列表
+  const getDistrictsMutation = trpc.amap.getDistrictsByCity.useMutation();
+
+  // 初始化省份列表
+  useEffect(() => {
+    if (provincesData?.success && provincesData.data) {
+      setProvincesList(provincesData.data);
+    }
+  }, [provincesData]);
+
+  // 当省份改变时，获取城市列表
+  useEffect(() => {
+    if (selectedProvinceAdcode) {
+      getCitiesMutation.mutate(
+        { provinceAdcode: selectedProvinceAdcode },
+        {
+          onSuccess: (data) => {
+            if (data.success && data.data) {
+              setCitiesList(data.data);
+              // 选择第一个城市
+              if (data.data.length > 0) {
+                setSelectedCityAdcode(data.data[0].adcode);
+              }
+            }
+          },
+        }
+      );
+    }
+  }, [selectedProvinceAdcode, getCitiesMutation]);
+
+  // 当城市改变时，获取区县列表
+  useEffect(() => {
+    if (selectedCityAdcode) {
+      getDistrictsMutation.mutate(
+        { cityAdcode: selectedCityAdcode },
+        {
+          onSuccess: (data) => {
+            if (data.success && data.data) {
+              setDistrictsList(data.data);
+              // 选择第一个区县
+              if (data.data.length > 0) {
+                setSelectedDistrictAdcode(data.data[0].adcode);
+              }
+            }
+          },
+        }
+      );
+    }
+  }, [selectedCityAdcode, getDistrictsMutation]);
 
   const searchAsyncMutation = trpc.gee.searchSentinel2Async.useMutation({
     onSuccess: (data) => {
@@ -77,24 +145,24 @@ export default function Home() {
     setSelectedImageId('');
     setTaskId(null);
 
+    // 获取选中的省市县名称
+    const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
+    const city = citiesList.find(c => c.adcode === selectedCityAdcode);
+    const district = districtsList.find(d => d.adcode === selectedDistrictAdcode);
+
     searchAsyncMutation.mutate({
-      province: selectedProvince,
-      city: selectedCity,
-      district: selectedDistrict,
+      province: province?.name || '',
+      city: city?.name || '',
+      district: district?.name || '',
       startDate,
       endDate,
       maxCloudCover,
     });
-  }, [selectedProvince, selectedCity, selectedDistrict, startDate, endDate, maxCloudCover, searchAsyncMutation]);
+  }, [selectedProvinceAdcode, selectedCityAdcode, selectedDistrictAdcode, provincesList, citiesList, districtsList, startDate, endDate, maxCloudCover, searchAsyncMutation]);
 
   const handleImageSelect = useCallback((image: SatelliteImage) => {
     setSelectedImageId(image.id);
   }, []);
-
-  const provincesList = chinaProvinces.map(p => ({
-    code: p.code,
-    name: p.name,
-  }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8">
@@ -119,14 +187,46 @@ export default function Home() {
             <CardContent className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-white">省份</Label>
-                <Select value={selectedProvince} onValueChange={setSelectedProvince}>
+                <Select value={selectedProvinceAdcode} onValueChange={setSelectedProvinceAdcode}>
                   <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-700 border-slate-600">
                     {provincesList.map(p => (
-                      <SelectItem key={p.code} value={p.code} className="text-white">
+                      <SelectItem key={p.adcode} value={p.adcode} className="text-white">
                         {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-white">城市</Label>
+                <Select value={selectedCityAdcode} onValueChange={setSelectedCityAdcode}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {citiesList.map(c => (
+                      <SelectItem key={c.adcode} value={c.adcode} className="text-white">
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-white">区县</Label>
+                <Select value={selectedDistrictAdcode} onValueChange={setSelectedDistrictAdcode}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {districtsList.map(d => (
+                      <SelectItem key={d.adcode} value={d.adcode} className="text-white">
+                        {d.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

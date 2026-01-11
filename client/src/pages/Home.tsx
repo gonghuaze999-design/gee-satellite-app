@@ -246,7 +246,12 @@ export default function Home() {
             <CardContent className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-white">省份</Label>
-                <Select value={selectedProvinceAdcode} onValueChange={setSelectedProvinceAdcode}>
+                <Select value={selectedProvinceAdcode} onValueChange={(value) => {
+                  setSelectedProvinceAdcode(value);
+                  // 重置城市和区县
+                  setSelectedCityAdcode('');
+                  setSelectedDistrictAdcode('');
+                }}>
                   <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                     <SelectValue />
                   </SelectTrigger>

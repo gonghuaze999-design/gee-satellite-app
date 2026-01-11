@@ -32,7 +32,7 @@ export const amapRouter = router({
    */
   getCitiesByProvince: publicProcedure
     .input(z.object({ provinceAdcode: z.string() }))
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       try {
         const cities = await getCitiesByProvince(input.provinceAdcode);
         return {
@@ -53,7 +53,7 @@ export const amapRouter = router({
    */
   getDistrictsByCity: publicProcedure
     .input(z.object({ cityAdcode: z.string() }))
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       try {
         const districts = await getDistrictsByCity(input.cityAdcode);
         return {
@@ -74,7 +74,7 @@ export const amapRouter = router({
    */
   getRegionByAdcode: publicProcedure
     .input(z.object({ adcode: z.string() }))
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       try {
         const region = await getRegionByAdcode(input.adcode);
         return {

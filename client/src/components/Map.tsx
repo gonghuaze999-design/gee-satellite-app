@@ -134,12 +134,17 @@ export function MapView({
     map.current = new window.google.maps.Map(mapContainer.current, {
       zoom: initialZoom,
       center: initialCenter,
+      mapTypeId: window.google.maps.MapTypeId.SATELLITE,
       mapTypeControl: true,
       fullscreenControl: true,
       zoomControl: true,
       streetViewControl: true,
       mapId: "DEMO_MAP_ID",
     });
+    // 设置默认为卫星地图
+    if (map.current) {
+      map.current.setMapTypeId(window.google.maps.MapTypeId.SATELLITE);
+    }
     if (onMapReady) {
       onMapReady(map.current);
     }

@@ -76,10 +76,16 @@ export default function Home() {
   const { data: provincesData } = trpc.amap.getProvinces.useQuery();
   
   // 获取城市列表
-  const getCitiesMutation = trpc.amap.getCitiesByProvince.useMutation();
+  const { data: citiesData } = trpc.amap.getCitiesByProvince.useQuery(
+    { provinceAdcode: selectedProvinceAdcode },
+    { enabled: !!selectedProvinceAdcode }
+  );
   
   // 获取区县列表
-  const getDistrictsMutation = trpc.amap.getDistrictsByCity.useMutation();
+  const { data: districtsData } = trpc.amap.getDistrictsByCity.useQuery(
+    { cityAdcode: selectedCityAdcode },
+    { enabled: !!selectedCityAdcode }
+  );
 
   // 初始化省份列表
   useEffect(() => {
@@ -90,43 +96,25 @@ export default function Home() {
 
   // 当省份改变时，获取城市列表
   useEffect(() => {
-    if (selectedProvinceAdcode) {
-      getCitiesMutation.mutate(
-        { provinceAdcode: selectedProvinceAdcode },
-        {
-          onSuccess: (data) => {
-            if (data.success && data.data) {
-              setCitiesList(data.data);
-              // 选择第一个城市
-              if (data.data.length > 0) {
-                setSelectedCityAdcode(data.data[0].adcode);
-              }
-            }
-          },
-        }
-      );
+    if (citiesData?.success && citiesData.data) {
+      setCitiesList(citiesData.data);
+      // 选择第一个城市
+      if (citiesData.data.length > 0) {
+        setSelectedCityAdcode(citiesData.data[0].adcode);
+      }
     }
-  }, [selectedProvinceAdcode, getCitiesMutation]);
+  }, [citiesData]);
 
   // 当城市改变时，获取区县列表
   useEffect(() => {
-    if (selectedCityAdcode) {
-      getDistrictsMutation.mutate(
-        { cityAdcode: selectedCityAdcode },
-        {
-          onSuccess: (data) => {
-            if (data.success && data.data) {
-              setDistrictsList(data.data);
-              // 选择第一个区县
-              if (data.data.length > 0) {
-                setSelectedDistrictAdcode(data.data[0].adcode);
-              }
-            }
-          },
-        }
-      );
+    if (districtsData?.success && districtsData.data) {
+      setDistrictsList(districtsData.data);
+      // 选择第一个区县
+      if (districtsData.data.length > 0) {
+        setSelectedDistrictAdcode(districtsData.data[0].adcode);
+      }
     }
-  }, [selectedCityAdcode, getDistrictsMutation]);
+  }, [districtsData]);
 
   const searchAsyncMutation = trpc.gee.searchSentinel2Async.useMutation({
     onSuccess: (data) => {

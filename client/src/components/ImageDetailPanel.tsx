@@ -1,10 +1,12 @@
 'use client';
 
-import { X, Calendar, Cloud, Zap, Maximize2 } from 'lucide-react';
+import { X, Calendar, Cloud, Zap, Maximize2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { trpc } from '@/lib/trpc';
 
 interface SatelliteImage {
   id: string;
@@ -22,14 +24,29 @@ interface ImageDetailPanelProps {
   image: SatelliteImage | null;
   onClose: () => void;
   onLoadToMap?: (image: SatelliteImage) => void;
+  geometry?: any;
 }
 
 export function ImageDetailPanel({
   image,
   onClose,
   onLoadToMap,
+  geometry,
 }: ImageDetailPanelProps) {
   const [opacity, setOpacity] = useState(100);
+  const [isDownloading, setIsDownloading] = useState(false);
+  
+  const exportMutation = trpc.gee.exportGeoTIFF.useMutation({
+    onSuccess: (result) => {
+      setIsDownloading(false);
+      toast.success(`导出任务已创建: ${result.taskId}`);
+      toast.info('文件将保存到您的Google Drive的GEE_Exports文件夹');
+    },
+    onError: (error: any) => {
+      setIsDownloading(false);
+      toast.error(`导出失败: ${error.message || '未知错误'}`);
+    },
+  });
 
   if (!image) {
     return (
@@ -204,12 +221,37 @@ export function ImageDetailPanel({
             </Button>
             <Button
               onClick={() => {
-                // 下载功能
-                toast.info('下载功能开发中');
+                if (!image) {
+                  toast.error('未选择影像');
+                  return;
+                }
+                setIsDownloading(true);
+                const fileName = `Sentinel2_${image.date.replace(/-/g, '')}_${image.id.split('/').pop()}`;
+                const defaultGeometry = {
+                  type: 'Rectangle',
+                  coordinates: [[116.4, 39.9], [116.7, 40.2]],
+                };
+                exportMutation.mutate({
+                  imageId: image.id,
+                  geometry: geometry || defaultGeometry,
+                  fileName: fileName,
+                  scale: 10,
+                });
               }}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              disabled={isDownloading}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
             >
-              下载影像
+              {isDownloading ? (
+                <>
+                  <span className="inline-block animate-spin mr-2">⏳</span>
+                  导出中...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  导出GeoTIFF
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
@@ -217,8 +259,3 @@ export function ImageDetailPanel({
     </div>
   );
 }
-
-// 简单的toast提示（如果没有引入toast库）
-const toast = {
-  info: (message: string) => console.log(message),
-};

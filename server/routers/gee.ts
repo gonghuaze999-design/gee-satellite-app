@@ -59,15 +59,16 @@ function executePythonScript(scriptName: string, args: any): Promise<any> {
       } else {
         try {
           const lines = stdout.trim().split('\n');
-          const jsonLine = lines.find(line => line.startsWith('['));
+          // 支持数组格式 [...] 和对象格式 {...}
+          const jsonLine = lines.find(line => line.startsWith('[') || line.startsWith('{'));
           if (!jsonLine) {
-            reject(new Error('No JSON output found'));
+            reject(new Error(`No JSON output found. stdout: ${stdout}, stderr: ${stderr}`));
             return;
           }
           const result = JSON.parse(jsonLine);
           resolve(result);
-        } catch (e) {
-          reject(new Error('Failed to parse Python output'));
+        } catch (e: any) {
+          reject(new Error(`Failed to parse Python output: ${e?.message || e}. stdout: ${stdout}`));
         }
       }
     });

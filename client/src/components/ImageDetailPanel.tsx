@@ -31,7 +31,28 @@ export function ImageDetailPanel({
 }: ImageDetailPanelProps) {
   const [opacity, setOpacity] = useState(100);
 
-  if (!image) return null;
+  if (!image) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Card className="bg-slate-800 border-slate-700 w-full max-w-2xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <CardTitle className="text-white">错误</CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-red-400">无法加载影像详情，请重新选择</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -101,7 +122,7 @@ export function ImageDetailPanel({
                     <Cloud className="w-4 h-4" />
                     云量覆盖
                   </label>
-                  <span className="text-white font-semibold">{image.cloudCover.toFixed(2)}%</span>
+                  <span className="text-white font-semibold">{image.cloudCover ? image.cloudCover.toFixed(2) : 'N/A'}%</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-2">
                   <div
@@ -117,7 +138,7 @@ export function ImageDetailPanel({
                     <Zap className="w-4 h-4" />
                     影像质量
                   </label>
-                  <span className="text-white font-semibold">{(image.quality * 100).toFixed(0)}%</span>
+                  <span className="text-white font-semibold">{image.quality ? (image.quality * 100).toFixed(0) : 'N/A'}%</span>
                 </div>
                 <div className="w-full bg-slate-700 rounded-full h-2">
                   <div
@@ -135,7 +156,7 @@ export function ImageDetailPanel({
               <h3 className="text-white font-semibold">植被指数 (NDVI)</h3>
               <div className="bg-slate-700 p-4 rounded">
                 <p className="text-gray-400 text-sm mb-2">NDVI值</p>
-                <p className="text-white text-2xl font-bold">{image.ndvi.toFixed(3)}</p>
+                <p className="text-white text-2xl font-bold">{image.ndvi ? image.ndvi.toFixed(3) : 'N/A'}</p>
                 <p className="text-gray-400 text-xs mt-2">
                   {image.ndvi > 0.5
                     ? '✅ 植被覆盖度高'

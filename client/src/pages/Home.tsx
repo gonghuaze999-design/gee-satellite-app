@@ -89,14 +89,18 @@ export default function Home() {
 
   // 初始化省份列表
   useEffect(() => {
+    console.log('[DEBUG] provincesData:', provincesData);
     if (provincesData?.success && provincesData.data) {
+      console.log('[DEBUG] Setting provinces:', provincesData.data);
       setProvincesList(provincesData.data);
     }
   }, [provincesData]);
 
   // 当省份改变时，获取城市列表
   useEffect(() => {
+    console.log('[DEBUG] citiesData:', citiesData);
     if (citiesData?.success && citiesData.data) {
+      console.log('[DEBUG] Setting cities:', citiesData.data);
       setCitiesList(citiesData.data);
       // 选择第一个城市
       if (citiesData.data.length > 0) {
@@ -107,7 +111,9 @@ export default function Home() {
 
   // 当城市改变时，获取区县列表
   useEffect(() => {
+    console.log('[DEBUG] districtsData:', districtsData);
     if (districtsData?.success && districtsData.data) {
+      console.log('[DEBUG] Setting districts:', districtsData.data);
       setDistrictsList(districtsData.data);
       // 选择第一个区县
       if (districtsData.data.length > 0) {
@@ -258,7 +264,9 @@ export default function Home() {
                 <Label className="text-white">城市</Label>
                 <Select value={selectedCityAdcode} onValueChange={setSelectedCityAdcode}>
                   <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
+                    <SelectValue placeholder="选择城市">
+                      {citiesList.find(c => c.adcode === selectedCityAdcode)?.name || '选择城市'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-slate-700 border-slate-600">
                     {citiesList.map(c => (
@@ -274,7 +282,9 @@ export default function Home() {
                 <Label className="text-white">区县</Label>
                 <Select value={selectedDistrictAdcode} onValueChange={setSelectedDistrictAdcode}>
                   <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue />
+                    <SelectValue placeholder="选择区县">
+                      {districtsList.find(d => d.adcode === selectedDistrictAdcode)?.name || '选择区县'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-slate-700 border-slate-600">
                     {districtsList.map(d => (

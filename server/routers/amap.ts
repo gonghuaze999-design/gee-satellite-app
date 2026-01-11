@@ -4,7 +4,6 @@ import {
   getProvinces,
   getCitiesByProvince,
   getDistrictsByCity,
-  getRegionByAdcode,
 } from '../services/amapService';
 
 export const amapRouter = router({
@@ -69,24 +68,5 @@ export const amapRouter = router({
       }
     }),
 
-  /**
-   * 根据adcode获取地区信息
-   */
-  getRegionByAdcode: publicProcedure
-    .input(z.object({ adcode: z.string() }))
-    .query(async ({ input }) => {
-      try {
-        const region = await getRegionByAdcode(input.adcode);
-        return {
-          success: true,
-          data: region,
-        };
-      } catch (error) {
-        console.error('[tRPC] getRegionByAdcode error:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
-      }
-    }),
+
 });

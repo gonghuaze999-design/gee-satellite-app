@@ -59,59 +59,25 @@ export async function getProvinces(): Promise<AmapRegion[]> {
 }
 
 /**
- * 获取指定省份下的所有城市 - 使用高德API实时获取
+ * 获取指定省份下的所有城市 - 使用本地数据库
  */
 export async function getCitiesByProvince(provinceAdcode: string): Promise<AmapRegion[]> {
   try {
-    // 先尝试从本地数据库获取（北京市）
-    const localCities = getCitiesByProvinceLocal(provinceAdcode);
-    if (localCities.length > 0) {
-      return localCities;
-    }
-
-    // 如果本地没有数据，调用高德API
-    if (!AMAP_API_KEY) {
-      console.warn('[AMAP] AMAP_API_KEY not configured, returning empty result');
-      return [];
-    }
-
-    const url = `https://restapi.amap.com/v3/config/district?key=${AMAP_API_KEY}&adcode=${provinceAdcode}&subdistrict=1`;
-    const response = await callAmapApi(url);
-    
-    // 高德API返回的districts是该省份下的所有城市
-    return convertAmapToAdminRegion(response, 'city');
+    return getCitiesByProvinceLocal(provinceAdcode);
   } catch (error) {
     console.error('[AMAP] Failed to get cities:', error);
-    // 返回空数组而不是抛出错误，允许应用继续运行
     return [];
   }
 }
 
 /**
- * 获取指定城市下的所有区县 - 使用高德API实时获取
+ * 获取指定城市下的所有区县 - 使用本地数据库
  */
 export async function getDistrictsByCity(cityAdcode: string): Promise<AmapRegion[]> {
   try {
-    // 先尝试从本地数据库获取（北京市）
-    const localDistricts = getDistrictsByCityLocal(cityAdcode);
-    if (localDistricts.length > 0) {
-      return localDistricts;
-    }
-
-    // 如果本地没有数据，调用高德API
-    if (!AMAP_API_KEY) {
-      console.warn('[AMAP] AMAP_API_KEY not configured, returning empty result');
-      return [];
-    }
-
-    const url = `https://restapi.amap.com/v3/config/district?key=${AMAP_API_KEY}&adcode=${cityAdcode}&subdistrict=1`;
-    const response = await callAmapApi(url);
-    
-    // 高德API返回的districts是该城市下的所有区县
-    return convertAmapToAdminRegion(response, 'district');
+    return getDistrictsByCityLocal(cityAdcode);
   } catch (error) {
     console.error('[AMAP] Failed to get districts:', error);
-    // 返回空数组而不是抛出错误，允许应用继续运行
     return [];
   }
 }

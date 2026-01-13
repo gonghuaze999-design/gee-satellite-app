@@ -39,12 +39,11 @@ interface SatelliteImage {
 }
 
 export default function Home() {
-  const mapRef = useRef<google.maps.Map | null>(null);
-  
-  const [selectedProvinceAdcode, setSelectedProvinceAdcode] = useState('110000');
+  const mapRef = useRef<any>(null);
+  const [selectedProvinceAdcode, setSelectedProvinceAdcode] = useState('110000'); // 默认北京
   const [selectedCityAdcode, setSelectedCityAdcode] = useState('110100');
-  const [selectedDistrictAdcode, setSelectedDistrictAdcode] = useState('');
-  
+  const [selectedDistrictAdcode, setSelectedDistrictAdcode] = useState('110101');
+  const [mapReady, setMapReady] = useState(false);  
   const [provincesList, setProvincesList] = useState<AdministrativeDivision[]>([]);
   const [citiesList, setCitiesList] = useState<AdministrativeDivision[]>([]);
   const [districtsList, setDistrictsList] = useState<AdministrativeDivision[]>([]);
@@ -104,10 +103,9 @@ export default function Home() {
     if (citiesData) {
       console.log('[DEBUG] Setting cities:', citiesData);
       setCitiesList(citiesData);
-      // 重置城市和区县选择
-      setSelectedCityAdcode('');
+      // 重置区县选择
       setSelectedDistrictAdcode('');
-      // 选择第一个城市
+      // 选择第一个城市（不重置，直接设置）
       if (citiesData.length > 0) {
         setSelectedCityAdcode(citiesData[0].adcode);
       }
@@ -140,45 +138,87 @@ export default function Home() {
     },
   });
 
-  const handleMapReady = useCallback((map: google.maps.Map) => {
+  const handleMapReady = useCallback((map: any) => {
     mapRef.current = map;
     // 设置默认中心到北京
-    map.setCenter({ lat: 39.9042, lng: 116.4074 });
-    map.setZoom(10);
+    if ('setView' in map) {
+      // Leaflet API
+      map.setView([39.9042, 116.4074], 10);
+    } else if ('setCenter' in map) {
+      // Google Maps API
+      map.setCenter({ lat: 39.9042, lng: 116.4074 });
+      map.setZoom(10);
+    }
+    setMapReady(true);
   }, []);
 
   // 当省份改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedProvinceAdcode) {
-      const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
+    console.log('[MAP-DEBUG] 省份 useEffect 触发', {
+      mapReady,
+      hasMap: !!mapRef.current,
+      selectedProvinceAdcode,
+      hasProvincesData: !!provincesData,
+      provincesDataLength: provincesData?.length
+    });
+    
+    if (mapReady && mapRef.current && selectedProvinceAdcode && provincesData) {
+      const province = provincesData.find(p => p.adcode === selectedProvinceAdcode);
+      console.log('[MAP-DEBUG] 找到的省份:', province);
+      
       if (province && province.lng && province.lat) {
-        mapRef.current.setCenter({ lat: province.lat, lng: province.lng });
-        mapRef.current.setZoom(7);
+        console.log('[MAP] 省份改变，定位到:', province.name, province.lng, province.lat);
+        if ('setView' in mapRef.current) {
+          // Leaflet API
+          console.log('[MAP] 使用 Leaflet API');
+          mapRef.current.setView([province.lat, province.lng], 7);
+        } else if ('setCenter' in mapRef.current) {
+          // Google Maps API
+          console.log('[MAP] 使用 Google Maps API');
+          mapRef.current.setCenter({ lat: province.lat, lng: province.lng });
+          mapRef.current.setZoom(7);
+        }
+      } else {
+        console.log('[MAP-DEBUG] 省份数据不完整或未找到');
       }
     }
-  }, [selectedProvinceAdcode, provincesList]);
+  }, [mapReady, selectedProvinceAdcode, provincesData]);
 
   // 当城市改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedCityAdcode) {
-      const city = citiesList.find(c => c.adcode === selectedCityAdcode);
+    if (mapReady && mapRef.current && selectedCityAdcode && citiesData) {
+      const city = citiesData.find(c => c.adcode === selectedCityAdcode);
       if (city && city.lng && city.lat) {
-        mapRef.current.setCenter({ lat: city.lat, lng: city.lng });
-        mapRef.current.setZoom(10);
+        console.log('[MAP] 城市改变，定位到:', city.name, city.lng, city.lat);
+        if ('setView' in mapRef.current) {
+          // Leaflet API
+          mapRef.current.setView([city.lat, city.lng], 10);
+        } else if ('setCenter' in mapRef.current) {
+          // Google Maps API
+          mapRef.current.setCenter({ lat: city.lat, lng: city.lng });
+          mapRef.current.setZoom(10);
+        }
       }
     }
-  }, [selectedCityAdcode, citiesList]);
+  }, [mapReady, selectedCityAdcode, citiesData]);
 
   // 当区县改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedDistrictAdcode) {
-      const district = districtsList.find(d => d.adcode === selectedDistrictAdcode);
+    if (mapReady && mapRef.current && selectedDistrictAdcode && districtsData) {
+      const district = districtsData.find(d => d.adcode === selectedDistrictAdcode);
       if (district && district.lng && district.lat) {
-        mapRef.current.setCenter({ lat: district.lat, lng: district.lng });
-        mapRef.current.setZoom(12);
+        console.log('[MAP] 区县改变，定位到:', district.name, district.lng, district.lat);
+        if ('setView' in mapRef.current) {
+          // Leaflet API
+          mapRef.current.setView([district.lat, district.lng], 12);
+        } else if ('setCenter' in mapRef.current) {
+          // Google Maps API
+          mapRef.current.setCenter({ lat: district.lat, lng: district.lng });
+          mapRef.current.setZoom(12);
+        }
       }
     }
-  }, [selectedDistrictAdcode, districtsList]);
+  }, [mapReady, selectedDistrictAdcode, districtsData]);
 
   const handleSearch = useCallback(() => {
     setImageList([]);

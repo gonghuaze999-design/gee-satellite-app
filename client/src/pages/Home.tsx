@@ -21,6 +21,8 @@ interface AdministrativeDivision {
   name: string;
   adcode: string;
   level: string;
+  lng?: number;
+  lat?: number;
   location?: string;
 }
 
@@ -73,38 +75,41 @@ export default function Home() {
   const { data: geeAuthStatus } = trpc.gee.checkAuth.useQuery();
   
   // 获取省份列表
-  const { data: provincesData } = trpc.amap.getProvinces.useQuery();
+  const { data: provincesData } = trpc.adminDivision.getProvinces.useQuery();
   
   // 获取城市列表
-  const { data: citiesData } = trpc.amap.getCitiesByProvince.useQuery(
-    { provinceAdcode: selectedProvinceAdcode },
+  const { data: citiesData } = trpc.adminDivision.getCitiesByProvince.useQuery(
+    { provinceCode: selectedProvinceAdcode },
     { enabled: !!selectedProvinceAdcode }
   );
   
   // 获取区县列表
-  const { data: districtsData } = trpc.amap.getDistrictsByCity.useQuery(
-    { cityAdcode: selectedCityAdcode },
+  const { data: districtsData } = trpc.adminDivision.getDistrictsByCity.useQuery(
+    { cityCode: selectedCityAdcode },
     { enabled: !!selectedCityAdcode }
   );
 
   // 初始化省份列表
   useEffect(() => {
     console.log('[DEBUG] provincesData:', provincesData);
-    if (provincesData?.success && provincesData.data) {
-      console.log('[DEBUG] Setting provinces:', provincesData.data);
-      setProvincesList(provincesData.data);
+    if (provincesData) {
+      console.log('[DEBUG] Setting provinces:', provincesData);
+      setProvincesList(provincesData);
     }
   }, [provincesData]);
 
   // 当省份改变时，获取城市列表
   useEffect(() => {
     console.log('[DEBUG] citiesData:', citiesData);
-    if (citiesData?.success && citiesData.data) {
-      console.log('[DEBUG] Setting cities:', citiesData.data);
-      setCitiesList(citiesData.data);
+    if (citiesData) {
+      console.log('[DEBUG] Setting cities:', citiesData);
+      setCitiesList(citiesData);
+      // 重置城市和区县选择
+      setSelectedCityAdcode('');
+      setSelectedDistrictAdcode('');
       // 选择第一个城市
-      if (citiesData.data.length > 0) {
-        setSelectedCityAdcode(citiesData.data[0].adcode);
+      if (citiesData.length > 0) {
+        setSelectedCityAdcode(citiesData[0].adcode);
       }
     }
   }, [citiesData]);
@@ -112,12 +117,14 @@ export default function Home() {
   // 当城市改变时，获取区县列表
   useEffect(() => {
     console.log('[DEBUG] districtsData:', districtsData);
-    if (districtsData?.success && districtsData.data) {
-      console.log('[DEBUG] Setting districts:', districtsData.data);
-      setDistrictsList(districtsData.data);
+    if (districtsData) {
+      console.log('[DEBUG] Setting districts:', districtsData);
+      setDistrictsList(districtsData);
+      // 重置区县选择
+      setSelectedDistrictAdcode('');
       // 选择第一个区县
-      if (districtsData.data.length > 0) {
-        setSelectedDistrictAdcode(districtsData.data[0].adcode);
+      if (districtsData.length > 0) {
+        setSelectedDistrictAdcode(districtsData[0].adcode);
       }
     }
   }, [districtsData]);
@@ -140,58 +147,38 @@ export default function Home() {
     map.setZoom(10);
   }, []);
 
-  // 当选择的地区改变时，自动定位地图
+  // 当省份改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && selectedDistrictAdcode) {
-      // 根据选中的区县获取其坐标并定位地图
-      const district = districtsList.find(d => d.adcode === selectedDistrictAdcode);
-      if (district && district.location) {
-        const [lng, lat] = district.location.split(',').map(Number);
-        mapRef.current.setCenter({ lat, lng });
-        mapRef.current.setZoom(12);
-      } else if (selectedCityAdcode) {
-        // 如果没有区县坐标，则使用城市坐标
-        const city = citiesList.find(c => c.adcode === selectedCityAdcode);
-        if (city && city.location) {
-          const [lng, lat] = city.location.split(',').map(Number);
-          mapRef.current.setCenter({ lat, lng });
-          mapRef.current.setZoom(11);
-        } else if (selectedProvinceAdcode) {
-          // 如果没有城市坐标，则使用省份坐标
-          const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
-          if (province && province.location) {
-            const [lng, lat] = province.location.split(',').map(Number);
-            mapRef.current.setCenter({ lat, lng });
-            mapRef.current.setZoom(9);
-          }
-        }
+    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedProvinceAdcode) {
+      const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
+      if (province && province.lng && province.lat) {
+        mapRef.current.setCenter({ lat: province.lat, lng: province.lng });
+        mapRef.current.setZoom(7);
       }
     }
-  }, [selectedDistrictAdcode, selectedCityAdcode, selectedProvinceAdcode, districtsList, citiesList, provincesList]);
+  }, [selectedProvinceAdcode, provincesList]);
 
   // 当城市改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && selectedCityAdcode && !selectedDistrictAdcode) {
+    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedCityAdcode) {
       const city = citiesList.find(c => c.adcode === selectedCityAdcode);
-      if (city && city.location) {
-        const [lng, lat] = city.location.split(',').map(Number);
-        mapRef.current.setCenter({ lat, lng });
-        mapRef.current.setZoom(11);
+      if (city && city.lng && city.lat) {
+        mapRef.current.setCenter({ lat: city.lat, lng: city.lng });
+        mapRef.current.setZoom(10);
       }
     }
-  }, [selectedCityAdcode, citiesList, selectedDistrictAdcode]);
+  }, [selectedCityAdcode, citiesList]);
 
-  // 当省份改变时，自动定位地图
+  // 当区县改变时，自动定位地图
   useEffect(() => {
-    if (mapRef.current && selectedProvinceAdcode && !selectedCityAdcode) {
-      const province = provincesList.find(p => p.adcode === selectedProvinceAdcode);
-      if (province && province.location) {
-        const [lng, lat] = province.location.split(',').map(Number);
-        mapRef.current.setCenter({ lat, lng });
-        mapRef.current.setZoom(9);
+    if (mapRef.current && typeof mapRef.current.setCenter === 'function' && selectedDistrictAdcode) {
+      const district = districtsList.find(d => d.adcode === selectedDistrictAdcode);
+      if (district && district.lng && district.lat) {
+        mapRef.current.setCenter({ lat: district.lat, lng: district.lng });
+        mapRef.current.setZoom(12);
       }
     }
-  }, [selectedProvinceAdcode, provincesList, selectedCityAdcode]);
+  }, [selectedDistrictAdcode, districtsList]);
 
   const handleSearch = useCallback(() => {
     setImageList([]);
